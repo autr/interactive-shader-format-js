@@ -9,10 +9,12 @@ import LineMapper from './ISFLineMapper';
 
 const mathJsEval = math.eval;
 
-function ISFRenderer(gl) {
-  this.gl = gl;
+function ISFRenderer(ctx) {
+  console.log('[ISFRenderer] constructor:', ctx)
+  this.ctx = ctx;
+  this.gl = ctx;
   this.uniforms = [];
-  this.contextState = new ISFGLState(this.gl);
+  this.contextState = new ISFGLState(this.ctx);
   this.setupPaintToScreen();
   this.startTime = Date.now();
   this.lastRenderTime = Date.now();
@@ -20,12 +22,14 @@ function ISFRenderer(gl) {
 }
 
 ISFRenderer.prototype.loadSource = function loadSource(fragmentISF, vertexISFOpt) {
+  console.log('[ISFRenderer] parsing shader:', {fragmentISF, vertexISFOpt})
   const parser = new ISFParser();
   parser.parse(fragmentISF, vertexISFOpt);
   this.sourceChanged(parser.fragmentShader, parser.vertexShader, parser);
 };
 
 ISFRenderer.prototype.sourceChanged = function sourceChanged(fragmentShader, vertexShader, model) {
+  console.log('[ISFRenderer] source loading:', {fragmentShader, vertexShader})
   this.fragmentShader = fragmentShader;
   this.vertexShader = vertexShader;
   this.model = model;
@@ -55,6 +59,7 @@ ISFRenderer.prototype.sourceChanged = function sourceChanged(fragmentShader, ver
 };
 
 ISFRenderer.prototype.initUniforms = function initUniforms() {
+  console.log('[ISFRenderer] initialising uniforms...')
   this.uniforms = this.findUniforms(this.fragmentShader);
   const inputs = this.model.inputs;
   for (let i = 0; i < inputs.length; ++i) {
@@ -72,6 +77,7 @@ ISFRenderer.prototype.initUniforms = function initUniforms() {
 };
 
 ISFRenderer.prototype.setValue = function setValue(name, value) {
+  // console.log(`[ISFRenderer] setting value... "${name}" ${value}`)
   this.program.use();
 
   const uniform = this.uniforms[name];
@@ -87,6 +93,7 @@ ISFRenderer.prototype.setValue = function setValue(name, value) {
 };
 
 ISFRenderer.prototype.setNormalizedValue = function setNormalizedValue(name, normalizedValue) {
+  console.log(`[ISFRenderer] setting normalized value... "${name}" ${normalizedValue}`)
   const inputs = this.model.inputs;
   let input = null;
   for (let i = 0; i < inputs.length; i++) {
@@ -104,18 +111,21 @@ ISFRenderer.prototype.setNormalizedValue = function setNormalizedValue(name, nor
 };
 
 ISFRenderer.prototype.setupPaintToScreen = function setupPaintToScreen() {
-  this.paintProgram = new ISFGLProgram(this.gl, this.basicVertexShader, this.basicFragmentShader);
+  console.log(`[ISFRenderer] setting up painting to screen...`, this)
+  this.paintProgram = new ISFGLProgram(this.ctx, this.basicVertexShader, this.basicFragmentShader);
   return this.paintProgram.bindVertices();
 };
 
 ISFRenderer.prototype.setupGL = function setupGL() {
+  console.log(`[ISFRenderer] setting up ISFGLProgram...`)
   this.cleanup();
-  this.program = new ISFGLProgram(this.gl, this.vertexShader, this.fragmentShader);
+  this.program = new ISFGLProgram(this.ctx, this.vertexShader, this.fragmentShader);
   this.program.bindVertices();
   this.generatePersistentBuffers();
 };
 
 ISFRenderer.prototype.generatePersistentBuffers = function generatePersistentBuffers() {
+  console.log(`[ISFRenderer] generating persistent buffers...`)
   this.renderBuffers = [];
   const passes = this.model.passes;
   for (let i = 0; i < passes.length; ++i) {
@@ -127,16 +137,18 @@ ISFRenderer.prototype.generatePersistentBuffers = function generatePersistentBuf
 };
 
 ISFRenderer.prototype.paintToScreen = function paintToScreen(destination, target) {
+  console.log(`[ISFRenderer] painting to screen...`)
   this.paintProgram.use();
-  this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
-  this.gl.viewport(0, 0, destination.width, destination.height);
+  this.ctx.bindFramebuffer(this.ctx.FRAMEBUFFER, null);
+  this.ctx.viewport(0, 0, destination.width, destination.height);
   const loc = this.paintProgram.getUniformLocation('tex');
   target.readTexture().bind(loc);
-  this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
+  this.ctx.drawArrays(this.ctx.TRIANGLES, 0, 6);
   this.program.use();
 };
 
 ISFRenderer.prototype.pushTextures = function pushTextures() {
+  console.log(`[ISFRenderer] push textures...`)
   Object.keys(this.uniforms).forEach((u) => {
     const uniform = this.uniforms[u];
     if (uniform.type === 't') this.pushTexture(uniform);
@@ -144,6 +156,7 @@ ISFRenderer.prototype.pushTextures = function pushTextures() {
 };
 
 ISFRenderer.prototype.pushTexture = function pushTexture(uniform) {
+  // console.log(`[ISFRenderer] push texture (single)...`)
   if (!uniform.value) {
     return;
   }
@@ -160,8 +173,8 @@ ISFRenderer.prototype.pushTexture = function pushTexture(uniform) {
 
   const loc = this.program.getUniformLocation(uniform.name);
   uniform.texture.bind(loc);
-  this.gl.texImage2D(
-    this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, uniform.value);
+  this.ctx.texImage2D(
+    this.ctx.TEXTURE_2D, 0, this.ctx.RGBA, this.ctx.RGBA, this.ctx.UNSIGNED_BYTE, uniform.value);
   if (!uniform.textureLoaded) {
     const img = uniform.value;
     uniform.textureLoaded = true;
@@ -174,12 +187,14 @@ ISFRenderer.prototype.pushTexture = function pushTexture(uniform) {
 };
 
 ISFRenderer.prototype.pushUniforms = function pushUniforms() {
+  console.log(`[ISFRenderer] push uniforms...`)
   for (const uniform of this.uniforms) {
     this.pushUniform(uniform);
   }
 };
 
 ISFRenderer.prototype.pushUniform = function pushUniform(uniform) {
+  // console.log(`[ISFRenderer] push uniform (single)...`)
   const loc = this.program.getUniformLocation(uniform.name);
   if (loc !== -1) {
     if (uniform.type === 't') {
@@ -189,22 +204,22 @@ ISFRenderer.prototype.pushUniform = function pushUniform(uniform) {
     const v = uniform.value;
     switch (uniform.type) {
       case 'f':
-        this.gl.uniform1f(loc, v);
+        this.ctx.uniform1f(loc, v);
         break;
       case 'v2':
-        this.gl.uniform2f(loc, v[0], v[1]);
+        this.ctx.uniform2f(loc, v[0], v[1]);
         break;
       case 'v3':
-        this.gl.uniform3f(loc, v[0], v[1], v[2]);
+        this.ctx.uniform3f(loc, v[0], v[1], v[2]);
         break;
       case 'v4':
-        this.gl.uniform4f(loc, v[0], v[1], v[2], v[3]);
+        this.ctx.uniform4f(loc, v[0], v[1], v[2], v[3]);
         break;
       case 'i':
-        this.gl.uniform1i(loc, v);
+        this.ctx.uniform1i(loc, v);
         break;
       case 'color':
-        this.gl.uniform4f(loc, v[0], v[1], v[2], v[3]);
+        this.ctx.uniform4f(loc, v[0], v[1], v[2], v[3]);
         break;
       default:
         console.log(`Unknown type for uniform setting ${uniform.type}`, uniform);
@@ -214,6 +229,7 @@ ISFRenderer.prototype.pushUniform = function pushUniform(uniform) {
 };
 
 ISFRenderer.prototype.findUniforms = function findUniforms(shader) {
+  console.log(`[ISFRenderer] find uniform... `)
   const lines = shader.split('\n');
   const uniforms = {};
   const len = lines.length;
@@ -326,28 +342,28 @@ ISFRenderer.prototype.draw = function draw(destination) {
       const h = this.evaluateSize(destination, pass.height);
       buffer.setSize(w, h);
       const writeTexture = buffer.writeTexture();
-      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, buffer.fbo);
-      this.gl.framebufferTexture2D(
-        this.gl.FRAMEBUFFER,
-        this.gl.COLOR_ATTACHMENT0,
-        this.gl.TEXTURE_2D,
+      this.ctx.bindFramebuffer(this.ctx.FRAMEBUFFER, buffer.fbo);
+      this.ctx.framebufferTexture2D(
+        this.ctx.FRAMEBUFFER,
+        this.ctx.COLOR_ATTACHMENT0,
+        this.ctx.TEXTURE_2D,
         writeTexture.texture,
         0);
       this.setValue('RENDERSIZE', [buffer.width, buffer.height]);
       lastTarget = buffer;
-      this.gl.viewport(0, 0, w, h);
+      this.ctx.viewport(0, 0, w, h);
     } else {
       const renderWidth = destination.width;
       const renderHeight = destination.height;
-      this.gl.bindTexture(this.gl.TEXTURE_2D, null);
-      this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+      this.ctx.bindTexture(this.ctx.TEXTURE_2D, null);
+      this.ctx.bindFramebuffer(this.ctx.FRAMEBUFFER, null);
       this.setValue('RENDERSIZE', [renderWidth, renderHeight]);
       lastTarget = null;
-      this.gl.viewport(0, 0, renderWidth, renderHeight);
+      this.ctx.viewport(0, 0, renderWidth, renderHeight);
     }
-    this.gl.drawArrays(this.gl.TRIANGLES, 0, 6);
-    this.gl.bindTexture(this.gl.TEXTURE_2D, null);
-    this.gl.bindFramebuffer(this.gl.FRAMEBUFFER, null);
+    this.ctx.drawArrays(this.ctx.TRIANGLES, 0, 6);
+    this.ctx.bindTexture(this.ctx.TEXTURE_2D, null);
+    this.ctx.bindFramebuffer(this.ctx.FRAMEBUFFER, null);
   }
 
   for (let i = 0; i < buffers.length; ++i) {
@@ -372,6 +388,7 @@ ISFRenderer.prototype.evaluateSize = function evaluateSize(destination, formula)
 };
 
 ISFRenderer.prototype.cleanup = function cleanup() {
+  console.log(`[ISFRenderer] cleaning up...`)
   this.contextState.reset();
   if (this.renderBuffers) {
     for (let i = 0; i < this.renderBuffers.length; ++i) {
@@ -380,7 +397,7 @@ ISFRenderer.prototype.cleanup = function cleanup() {
   }
 };
 
-ISFRenderer.prototype.basicVertexShader = "precision mediump float;\nprecision mediump int;\nattribute vec2 isf_position; // -1..1\nvarying vec2 texCoord;\n\nvoid main(void) {\n  // Since webgl doesn't support ftransform, we do this by hand.\n  gl_Position = vec4(isf_position, 0, 1);\n  texCoord = isf_position;\n}\n";
+ISFRenderer.prototype.basicVertexShader = "precision mediump float;\nprecision mediump int;\nattribute vec2 isf_position; // -1..1\nvarying vec2 texCoord;\n\nvoid main(void) {\n  // Since webctx doesn't support ftransform, we do this by hand.\n  gl_Position = vec4(isf_position, 0, 1);\n  texCoord = isf_position;\n}\n";
 
 ISFRenderer.prototype.basicFragmentShader = 'precision mediump float;\nuniform sampler2D tex;\nvarying vec2 texCoord;\nvoid main()\n{\n  gl_FragColor = texture2D(tex, texCoord * 0.5 + 0.5);\n  //gl_FragColor = vec4(texCoord.x);\n}';
 
