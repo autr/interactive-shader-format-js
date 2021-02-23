@@ -1,4 +1,5 @@
 function ISFGLProgram(gl, vs, fs) {
+  console.log('[ISFGLProgram] constructor:', gl, vs.length, fs.length)
   this.gl = gl;
   this.vShader = this.createShader(vs, this.gl.VERTEX_SHADER);
   this.fShader = this.createShader(fs, this.gl.FRAGMENT_SHADER);

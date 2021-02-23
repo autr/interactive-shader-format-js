@@ -111,13 +111,13 @@ ISFRenderer.prototype.setNormalizedValue = function setNormalizedValue(name, nor
 };
 
 ISFRenderer.prototype.setupPaintToScreen = function setupPaintToScreen() {
-  console.log(`[ISFRenderer] setting up painting to screen...`, this)
+  console.log(`[ISFRenderer] setting up new ISFGLProgram (setupPaintToScreen)...`, this.ctx)
   this.paintProgram = new ISFGLProgram(this.ctx, this.basicVertexShader, this.basicFragmentShader);
   return this.paintProgram.bindVertices();
 };
 
 ISFRenderer.prototype.setupGL = function setupGL() {
-  console.log(`[ISFRenderer] setting up ISFGLProgram...`)
+  console.log(`[ISFRenderer] setting up new ISFGLProgram (setupGL)...`, this.ctx)
   this.cleanup();
   this.program = new ISFGLProgram(this.ctx, this.vertexShader, this.fragmentShader);
   this.program.bindVertices();
